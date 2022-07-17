@@ -1,4 +1,4 @@
-FROM ubuntu:20.04
+FROM ubuntu:18.04
 
 # Update apt cache
 RUN apt-get update
@@ -21,7 +21,8 @@ RUN DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
 # Install WebRTC for Linux compile dependencies
 RUN DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
     libxml2 \
-    pkg-config
+    pkg-config \
+    lsb-release
 
 # Add user
 ARG USERNAME=docker-webrtc
@@ -44,6 +45,14 @@ RUN mkdir /webrtc && chown $UID:$GID /webrtc
 ENV CCACHE_DIR /webrtc/.ccache
 ENV CCACHE_BASEDIR /webrtc/src
 ENV CCACHE_SLOPPINESS include_file_mtime
+
+# Run the dependencies scripts
+COPY install-build-deps.sh /tmp
+COPY install-build-deps-android.sh /tmp
+COPY sources.list /etc/apt
+ENV TZ=Asia/Shanghai
+RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
+RUN /bin/bash -c "/tmp/install-build-deps-android.sh"
 
 # Run as user
 USER $USERNAME

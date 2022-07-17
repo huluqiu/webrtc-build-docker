@@ -1,7 +1,9 @@
 #!/bin/bash
 set -euo pipefail
+THIS_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 TARGETS="${WEBRTC_TARGETS:-arm arm64 x86 x64}"
 BUILD_ARGS="${WEBRTC_BUILD_ARGS:-symbol_level=1 enable_libaom=false}"
+WEBRTC_ROOT_DIR=${THIS_DIR}/webrtc
 
 function print_usage {
     echo "Usage: $0 <command> [<args>]"
@@ -29,7 +31,7 @@ function build_target {
     target=$1
     build_args=${@:2}
 
-    docker run -it -v ${PWD}/webrtc:/webrtc threema/webrtc-build-tools:latest bash -c "
+    docker run -it -v ${WEBRTC_ROOT_DIR}:/webrtc threema/webrtc-build-tools:latest bash -c "
         set -euo pipefail
         cd src
         gn gen out/android-${target} --args='cc_wrapper=\"ccache\" target_os=\"android\" target_cpu=\"${target}\" ${build_args}'
@@ -43,7 +45,7 @@ function after_build_target {
 
     # Copy shared library
     mkdir -p out/${target}/
-    cp webrtc/src/out/android-${target}/libjingle_peerconnection_so.so out/${target}/
+    cp ${WEBRTC_ROOT_DIR}/src/out/android-${target}/libjingle_peerconnection_so.so out/${target}/
 }
 
 function after_build_common {
@@ -52,11 +54,11 @@ function after_build_common {
 
     # Copy Java library
     mkdir -p out/
-    cp webrtc/src/out/android-${target}/lib.java/sdk/android/libwebrtc.jar out/
+    cp ${WEBRTC_ROOT_DIR}/src/out/android-${target}/lib.java/sdk/android/libwebrtc.jar out/
 
     # Log revision and build args
     mkdir -p out/
-    (cd webrtc/src && git log --pretty=fuller HEAD...HEAD^ > ../../out/revision.txt)
+    (cd ${WEBRTC_ROOT_DIR}/src && git log --pretty=fuller HEAD...HEAD^ > ../../out/revision.txt)
     echo "${build_args}" > out/build_args.txt
 }
 
@@ -67,7 +69,7 @@ case ${1-} in
         echo "Removing tools image"
         docker rmi threema/webrtc-build-tools:latest || true
         echo "Removing source files"
-        rm -rf webrtc
+        rm -rf ${WEBRTC_ROOT_DIR}
         ;;
 
     build-tools)
@@ -79,16 +81,16 @@ case ${1-} in
 
     fetch)
         require_tools_image
-        if [[ -d "webrtc" ]]; then
+        if [[ -d ${WEBRTC_ROOT_DIR} ]]; then
             echo "Cannot fetch, source directory 'webrtc' already exists"
             echo "Run '$0 clean' to start from scratch"
             exit 3;
         fi
-        
+
         # Fetch sources
-        mkdir webrtc
+        mkdir ${WEBRTC_ROOT_DIR}
         revision=${2:-main}
-        docker run -it -v ${PWD}/webrtc:/webrtc threema/webrtc-build-tools:latest bash -c "
+        docker run -it -v ${WEBRTC_ROOT_DIR}:/webrtc threema/webrtc-build-tools:latest bash -c "
             set -euo pipefail
             echo 'Fetching source files'
             fetch webrtc_android
@@ -98,20 +100,20 @@ case ${1-} in
             gclient sync
         "
         ;;
-    
+
     update)
         require_tools_image
-        if [[ ! -d "webrtc" ]]; then
+        if [[ ! -d ${WEBRTC_ROOT_DIR} ]]; then
             echo "Cannot update, source directory 'webrtc' does not exist"
             echo "Did you forget to run an initial '$0 fetch'?"
             exit 4;
         fi
-        
+
         # Stash existing patches/uncommitted changes
-        (cd webrtc/src && git stash push -u)
+        (cd ${WEBRTC_ROOT_DIR}/src && git stash push -u)
 
         # Update sources
-        docker run -it -v ${PWD}/webrtc:/webrtc threema/webrtc-build-tools:latest bash -c "
+        docker run -it -v ${WEBRTC_ROOT_DIR}:/webrtc threema/webrtc-build-tools:latest bash -c "
             set -euo pipefail
             echo \"Updating current branch (\$(cd src && git branch --show-current))\"
             (cd src && git rebase-update --current)
@@ -122,18 +124,18 @@ case ${1-} in
         ;;
 
     patch)
-        if [[ ! -d "webrtc" ]]; then
+        if [[ ! -d ${WEBRTC_ROOT_DIR} ]]; then
             echo "Cannot patch, source directory 'webrtc' does not exist"
             echo "Did you forget to run an initial '$0 fetch'?"
             exit 4;
         fi
-    
+
         # Stash existing patches/uncommitted changes
-        (cd webrtc/src && git stash push -u)
+        (cd ${WEBRTC_ROOT_DIR}/src && git stash push -u)
 
         # Apply patches
         pattern=${2-*.patch}
-        cd webrtc/src
+        cd ${WEBRTC_ROOT_DIR}/src
         shopt -s nullglob
         patch_count=0
         for patch in ../../patches/${pattern}; do
@@ -151,7 +153,7 @@ case ${1-} in
 
     build)
         require_tools_image
-        if [[ ! -d "webrtc" ]]; then
+        if [[ ! -d ${WEBRTC_ROOT_DIR} ]]; then
             echo "Cannot build, source directory 'webrtc' does not exist"
             echo "Did you forget to run an initial '$0 fetch'?"
             exit 4;
@@ -168,10 +170,10 @@ case ${1-} in
         after_build_common ${target} ${BUILD_ARGS}
         echo "Built ${target} into out/${target}"
         ;;
-    
+
     build-all)
         require_tools_image
-        if [[ ! -d "webrtc" ]]; then
+        if [[ ! -d ${WEBRTC_ROOT_DIR} ]]; then
             echo "Cannot build, source directory 'webrtc' does not exist"
             echo "Did you forget to run an initial '$0 fetch'?"
             exit 4;
@@ -189,9 +191,9 @@ case ${1-} in
 
     run)
         require_tools_image
-        
+
         # Run an interactive shell
-        docker run -it -v ${PWD}/webrtc:/webrtc threema/webrtc-build-tools:latest
+        docker run -it -v ${WEBRTC_ROOT_DIR}:/webrtc threema/webrtc-build-tools:latest
         ;;
 
     *)
