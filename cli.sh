@@ -1,9 +1,13 @@
 #!/bin/bash
 set -euo pipefail
 THIS_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
-TARGETS="${WEBRTC_TARGETS:-arm arm64 x86 x64}"
-BUILD_ARGS="${WEBRTC_BUILD_ARGS:-symbol_level=1 enable_libaom=false}"
 WEBRTC_ROOT_DIR=${THIS_DIR}/webrtc
+
+TARGETS="${WEBRTC_TARGETS:-arm arm64 x86 x64}"
+if [[ -e ${THIS_DIR}/.webrtc-build-args ]]; then
+    WEBRTC_BUILD_ARGS=$(cat ${THIS_DIR}/.webrtc-build-args)
+fi
+BUILD_ARGS="${WEBRTC_BUILD_ARGS:-symbol_level=1 enable_libaom=false}"
 
 function print_usage {
     echo "Usage: $0 <command> [<args>]"
@@ -37,6 +41,17 @@ function build_target {
         gn gen out/android-${target} --args='cc_wrapper=\"ccache\" target_os=\"android\" target_cpu=\"${target}\" ${build_args}'
         source build/android/envsetup.sh
         autoninja -C out/android-${target} webrtc
+    "
+}
+
+function build_aar {
+    target=$1
+    build_args=${@:2}
+
+    docker run -it --rm -v ${WEBRTC_ROOT_DIR}:/webrtc threema/webrtc-build-tools:latest bash -c "
+        set -euo pipefail
+        cd src
+        tools_webrtc/android/build_aar.py --build-dir out/android-aar --extra-gn-args ${build_args} --arch \"${target}\" --output out/android-aar/libwebrtc.aar
     "
 }
 
@@ -188,6 +203,26 @@ case ${1-} in
         done
         after_build_common ${target} ${BUILD_ARGS}
         ;;
+
+    build-aar)
+        require_tools_image
+        if [[ ! -d ${WEBRTC_ROOT_DIR} ]]; then
+            echo "Cannot build, source directory 'webrtc' does not exist"
+            echo "Did you forget to run an initial '$0 fetch'?"
+            exit 4;
+        fi
+
+        # Build target and copy files into out/
+        if [ -z "${2-}" ]; then
+            print_usage
+        fi
+        target=$2
+        echo "Building ${target}"
+        build_aar ${target} ${BUILD_ARGS}
+        #after_build_target ${target}
+        #after_build_common ${target} ${BUILD_ARGS}
+        echo "Built ${target} into out/${target}"
+    ;;
 
     run)
         require_tools_image
