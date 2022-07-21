@@ -35,12 +35,34 @@ function build_target {
     target=$1
     build_args=${@:2}
 
-    docker run -it -v ${WEBRTC_ROOT_DIR}:/webrtc threema/webrtc-build-tools:latest bash -c "
+    case ${target} in
+        armeabi)
+            target_cpu="arm"
+            ;;
+        armeabi-v7a)
+            target_cpu="arm"
+            ;;
+        arm64-v8a)
+            target_cpu="arm64"
+            ;;
+        x86)
+            target_cpu="x86"
+            ;;
+        x86_64)
+            target_cpu="x64"
+            ;;
+        *)
+            echo "invalid target."
+            exit 1
+            ;;
+    esac
+
+    docker run -it --rm -v ${WEBRTC_ROOT_DIR}:/webrtc threema/webrtc-build-tools:latest bash -c "
         set -euo pipefail
         cd src
-        gn gen out/android-${target} --args='cc_wrapper=\"ccache\" target_os=\"android\" target_cpu=\"${target}\" ${build_args}'
+        gn gen out/android/${target} --args= target_os=\"android\" target_cpu=\"${target_cpu}\" ${build_args}'
         source build/android/envsetup.sh
-        autoninja -C out/android-${target} webrtc
+        autoninja -C out/android/${target} webrtc
     "
 }
 
@@ -51,7 +73,7 @@ function build_aar {
     docker run -it --rm -v ${WEBRTC_ROOT_DIR}:/webrtc threema/webrtc-build-tools:latest bash -c "
         set -euo pipefail
         cd src
-        tools_webrtc/android/build_aar.py --build-dir out/android-aar --extra-gn-args ${build_args} --arch \"${target}\" --output out/android-aar/libwebrtc.aar
+        tools_webrtc/android/build_aar.py --build-dir out/android --extra-gn-args ${build_args} --arch \"${target}\" --output out/android/libwebrtc.aar
     "
 }
 
@@ -60,7 +82,7 @@ function after_build_target {
 
     # Copy shared library
     mkdir -p out/${target}/
-    cp ${WEBRTC_ROOT_DIR}/src/out/android-${target}/libjingle_peerconnection_so.so out/${target}/
+    cp ${WEBRTC_ROOT_DIR}/src/out/android/${target}/libjingle_peerconnection_so.so out/${target}/
 }
 
 function after_build_common {
@@ -69,7 +91,7 @@ function after_build_common {
 
     # Copy Java library
     mkdir -p out/
-    cp ${WEBRTC_ROOT_DIR}/src/out/android-${target}/lib.java/sdk/android/libwebrtc.jar out/
+    cp ${WEBRTC_ROOT_DIR}/src/out/android/${target}/lib.java/sdk/android/libwebrtc.jar out/
 
     # Log revision and build args
     mkdir -p out/
@@ -181,8 +203,8 @@ case ${1-} in
         target=$2
         echo "Building ${target}"
         build_target ${target} ${BUILD_ARGS}
-        after_build_target ${target}
-        after_build_common ${target} ${BUILD_ARGS}
+        #after_build_target ${target}
+        #after_build_common ${target} ${BUILD_ARGS}
         echo "Built ${target} into out/${target}"
         ;;
 
