@@ -250,7 +250,7 @@ case ${1-} in
         require_tools_image
 
         # Run an interactive shell
-        docker run -it -v ${WEBRTC_ROOT_DIR}:/webrtc threema/webrtc-build-tools:latest
+        docker run -it --rm -v ${WEBRTC_ROOT_DIR}:/webrtc threema/webrtc-build-tools:latest
         ;;
 
     *)
