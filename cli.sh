@@ -7,7 +7,7 @@ TARGETS="${WEBRTC_TARGETS:-arm arm64 x86 x64}"
 if [[ -e ${THIS_DIR}/.webrtc-build-args ]]; then
     WEBRTC_BUILD_ARGS=$(cat ${THIS_DIR}/.webrtc-build-args)
 fi
-BUILD_ARGS="${WEBRTC_BUILD_ARGS:-symbol_level=1 enable_libaom=false}"
+BUILD_ARGS="${WEBRTC_BUILD_ARGS:-symbol_level=2}"
 
 function print_usage {
     echo "Usage: $0 <command> [<args>]"
@@ -60,7 +60,7 @@ function build_target {
     docker run -it --rm -v ${WEBRTC_ROOT_DIR}:/webrtc threema/webrtc-build-tools:latest bash -c "
         set -euo pipefail
         cd src
-        gn gen out/android/${target} --args= target_os=\"android\" target_cpu=\"${target_cpu}\" ${build_args}'
+        gn gen out/android/${target} --args='target_os=\"android\" target_cpu=\"${target_cpu}\" ${build_args}'
         source build/android/envsetup.sh
         autoninja -C out/android/${target} webrtc
     "
@@ -73,7 +73,7 @@ function build_aar {
     docker run -it --rm -v ${WEBRTC_ROOT_DIR}:/webrtc threema/webrtc-build-tools:latest bash -c "
         set -euo pipefail
         cd src
-        tools_webrtc/android/build_aar.py --build-dir out/android --extra-gn-args ${build_args} --arch \"${target}\" --output out/android/libwebrtc.aar
+        tools_webrtc/android/build_aar.py --build-dir out/android --extra-gn-args '${build_args}' --arch \"${target}\" --output out/android/libwebrtc.aar
     "
 }
 
