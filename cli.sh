@@ -253,6 +253,16 @@ case ${1-} in
         docker run -it --rm -v ${WEBRTC_ROOT_DIR}:/webrtc threema/webrtc-build-tools:latest
         ;;
 
+    run-cmd)
+        require_tools_image
+
+        # Run an interactive shell
+        docker run -it --rm -v ${WEBRTC_ROOT_DIR}:/webrtc threema/webrtc-build-tools:latest bash -c "
+            cd src
+            ${*:2}
+        "
+        ;;
+
     *)
         print_usage $0
 esac
